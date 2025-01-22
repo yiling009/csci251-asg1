@@ -17,8 +17,8 @@ struct CityData
     std::pair<int, int> topRightCoord = {INT_MIN, INT_MIN}; // Initialize to min integer values as top right is always greater than lower left
     float avgAtmosphericPressure = 0.f; // Initialize to 0
     float avgCloudCover = 0.f; // Initialize to 0
+    std::string cityname; // Add this field to store the city name
 };
-
 
 struct GridCellInfo 
 {
@@ -28,13 +28,13 @@ struct GridCellInfo
     float cloudCover = 0.f; 
 
     static unsigned numberOfDigits; // Number of digits for city ID, used for padding when printing city map
-    static unsigned numberOfDigitsYaxis; // Number of digits for city ID, used for padding when printing city map
+    static unsigned numberOfDigitsYaxis ; // Number of digits for city ID, used for padding when printing city map
     static unsigned leftPadding; // Number of digits for city ID, used for padding when printing city map
     static unsigned rightPadding; // Number of digits for city ID, used for padding when printing city map
 
-    string cityMapPrintCell(); // Print the cell for city map, pad with 2 spaces (left and right), will print blank space if it is not city
-    string lmhMapPrintCell(bool cloud = false); // Print the cell for LMH map, pad with 2 spaces (left and right), will print blank space if it is not city
-    string indMapPrintCell(bool cloud = false); // Print the cell for Atmospheric Pressure map, pad with 2 spaces (left and right), will print blank space if it is not city
+    string cityMapPrintCell(); // Print the cell for city map, pad with 2 spaces (left and right)
+    string lmhMapPrintCell(bool cloud = false); // Print the cell for LMH map, pad with 2 spaces (left and right)
+    string indMapPrintCell(bool cloud = false); // Print the cell for Atmospheric Pressure map, pad with 2 spaces 
 };
 
 string GridCellInfo::cityMapPrintCell() 
@@ -48,7 +48,6 @@ string GridCellInfo::cityMapPrintCell()
         // Format the output with the letter centered and padded with spaces
         oss << setw(leftPadding + 1) << setfill(' ') << ' ' << cityId << setw(rightPadding + 1) << ' ';
     } 
-    
     else 
     {
         // If the cell is not a city, output a blank space with the same width
@@ -90,7 +89,6 @@ char convertToLMHSymbol(float value) {
     }
 }
 
-
 string GridCellInfo::lmhMapPrintCell(bool cloud) {
     ostringstream oss;
     char letter = ' ';
@@ -120,10 +118,11 @@ int countNumberOfDigits(int number)
     return static_cast<int>(log10(abs(number))) + 1; //log10 is from cmath
 }
 
-// Global variables
+
 GridCellInfo** grid; // Global grid which houses all the information, 2d array
 int gridXmin = 0, gridXmax = 0, gridYmin = 0, gridYmax = 0; 
 unsigned GridCellInfo::numberOfDigits = 0; // Initialize number of digits for city ID to 0 digits
+unsigned GridCellInfo::numberOfDigitsYaxis = 0; // Initialize number of digits for city ID to 0 digits
 unsigned GridCellInfo::leftPadding = 0; // Initialize left padding for print to 0 space
 unsigned GridCellInfo::rightPadding = 0; // Initialize right padding for print to 0 space
 std::map<int, CityData> cityDataMap; // Map to store city data, key is city ID, value is CityData struct
@@ -177,7 +176,7 @@ void deallocateMemory(int colSize, int rowSize)
 
 void processCityData(const string& line, int fileDataType) 
 { // fileDataType: 0 is citylocation.txt, 1 is cloudcover.txt, 2 is pressure.txt
-    int xPos=-1, yPos=-1, cityID=-1, gridValue=-1, citySize=-1; // -1 is invalid value
+    int xPos=-1, yPos=-1, cityID=-1, gridValue=-1; // -1 is invalid value
 
     size_t dashPosition = line.find('-');
     if (dashPosition != string::npos) 
@@ -187,7 +186,7 @@ void processCityData(const string& line, int fileDataType)
 
 
         // Remove [] and space from beforeDash
-        beforeDash.erase(remove_if(beforeDash.begin(), beforeDash.end(), [](char c) 
+        beforeDash.erase(remove_if(beforeDash.begin(), beforeDash.end(),[](char c) 
         {
             return c == ' ' || c == '[' || c == ']';
         }), beforeDash.end());
@@ -214,40 +213,27 @@ void processCityData(const string& line, int fileDataType)
             xPos -= gridXmin; // Adjust x position to start from 0
             yPos -= gridYmin; // Adjust y position to start from 0
         }
+
         
-        // Extract city ID and city size, e.g. "50-Big_City", only will find hyphen if it is a citylocation.txt file
+        // Extract city ID and city size, e.g. "5-Big_City", only will find hyphen if it is a citylocation.txt file
         size_t hyphenPosition = afterDash.find('-');
         if (hyphenPosition != string::npos) 
         {
-            string beforeHyphen = afterDash.substr(0, hyphenPosition); // "50"
-            string afterHyphen = afterDash.substr(hyphenPosition + 1); // "Big_City"
+            string beforeHyphen = afterDash.substr(0, hyphenPosition); // "5"
+            string cityname = afterDash.substr(hyphenPosition + 1); // "Big_City"
 
             // Convert to integers
-            cityID = stoi(beforeHyphen); // 50
+            cityID = stoi(beforeHyphen); // 5
             // Validate city ID
             if (cityID < 0) 
             {
                 cerr << "Error: Invalid city ID." << endl;
             }
 
-            // Determine city size
-            int citySize;
-            if (afterHyphen == "Big_City") 
-            {
-                citySize = 3;
-            } else if (afterHyphen == "Mid_City") 
-            {
-                citySize = 2;
-            } else if (afterHyphen == "Small_City") 
-            {
-                citySize = 1;
-            } else 
-            {
-                cerr << "Error: Invalid city size." << endl;
-            }
-
             grid[xPos][yPos].isCity = true; // Set the cell as a city
             grid[xPos][yPos].cityId = cityID; // Set the city ID
+
+            cityDataMap[cityID].cityname = cityname; //store city name in
 
             cityDataMap[cityID].lowerLeftCoord = std::make_pair(
                 std::min(xPos, cityDataMap[cityID].lowerLeftCoord.first),
@@ -260,7 +246,8 @@ void processCityData(const string& line, int fileDataType)
             ); // Set the lower left coordinate
 
 
-        } else 
+        } 
+        else 
         {
             // Could either be cloudcover.txt or pressure.txt
             gridValue = stoi(afterDash);
@@ -281,6 +268,8 @@ void processCityData(const string& line, int fileDataType)
         }
     }
 }
+
+
 bool inFile;
 
 void printMap(int option) {
@@ -288,46 +277,31 @@ void printMap(int option) {
     int y_range = (gridYmax - gridYmin) + 1;
 
     // Print border (top)
-    cout << setw(GridCellInfo::numberOfDigitsYaxis) << setfill(' ') << " ";
+    cout << setw(GridCellInfo::numberOfDigits) << setfill(' ') << " ";
     for (int i = 0; i < x_range + 2; i++) {
-        cout << setw(GridCellInfo::leftPadding + GridCellInfo::numberOfDigits) << setfill(' ') << '#' << setw(GridCellInfo::rightPadding) << setfill(' ') << "";
+        cout << setw(GridCellInfo::leftPadding + 1) << setfill(' ') << ' ' << '#' << ' ';
     }
     cout << endl;
-//      0   1   2   3   4   5   6   7   8   9
-//      0   1   2   3   4   5   6   7   8
-/*
-int totalWidth = 5; // Total width for each field
-    int numWidth = to_string(num).length(); // Width of the number
-    int leftPadding = (totalWidth - numWidth) / 2; // Spaces on the left
-    int rightPadding = totalWidth - numWidth - leftPadding; // Spaces on the right
 
-    cout << setw(leftPadding + numWidth) << setfill(' ') << num; // Left padding + number
-    cout << setw(rightPadding) << setfill(' ') << ""; // Right padding
-*/
     // Print grid content
     for (int y = y_range - 1; y >= 0; y--) {
-        cout << setw(GridCellInfo::numberOfDigits) << setfill(' ') << y << " # "; // Row label (y-axis)
+        cout << y << " # "; // Row label (y-axis)
         for (int x = 0; x < x_range; x++) {
             switch (option){
                 case 1: //"Display City Map"
-                    if(grid[x][y].cityId > -1) {
-                        cout << setw(GridCellInfo::leftPadding + GridCellInfo::numberOfDigits) << setfill(' ') << grid[x][y].cityId << setw(GridCellInfo::rightPadding) << setfill(' ') << "";
-                    } else {
-                        cout << setw(GridCellInfo::leftPadding + GridCellInfo::numberOfDigits) << setfill(' ') << ' ' << setw(GridCellInfo::rightPadding) << setfill(' ') << "";
-                    }
-                    // cout << setw(GridCellInfo::leftPadding + GridCellInfo::numberOfDigits + GridCellInfo::rightPadding) << setfill(' ') << grid[x][y].cityId;
+                    cout << setw(GridCellInfo::leftPadding + 1) << setfill(' ') << grid[x][y].cityMapPrintCell();
                     break;
                 case 2: //"Display Cloud Coverage Map (Cloudiness Index)"
-                    cout << setw(GridCellInfo::leftPadding + GridCellInfo::numberOfDigits + GridCellInfo::rightPadding) << setfill(' ') << grid[x][y].indMapPrintCell(true);
+                    cout << setw(GridCellInfo::leftPadding + 1) << setfill(' ') << grid[x][y].indMapPrintCell(true);
                     break;
                 case 3: //"Display Cloud Coverage Map (LMH Symbol)"
-                    cout << setw(GridCellInfo::leftPadding + GridCellInfo::numberOfDigits + GridCellInfo::rightPadding) << setfill(' ') << grid[x][y].lmhMapPrintCell(true);
+                    cout << setw(GridCellInfo::leftPadding + 1) << setfill(' ') << grid[x][y].lmhMapPrintCell(true);
                     break;
                 case 4: //"Display atmospheric pressure map (Pressure Index)"
-                    cout << setw(GridCellInfo::leftPadding + GridCellInfo::numberOfDigits + GridCellInfo::rightPadding) << setfill(' ') << grid[x][y].indMapPrintCell(false);
+                    cout << setw(GridCellInfo::leftPadding + 1) << setfill(' ') << grid[x][y].indMapPrintCell(false);
                     break;
                 case 5: //"Display atmospheric pressure map (LMH symbol)"
-                    cout << setw(GridCellInfo::leftPadding + GridCellInfo::numberOfDigits + GridCellInfo::rightPadding) << setfill(' ') << grid[x][y].lmhMapPrintCell(false);
+                    cout << setw(GridCellInfo::leftPadding + 1) << setfill(' ') << grid[x][y].lmhMapPrintCell(false);
                     break;
                 default:
                     break;
@@ -338,17 +312,18 @@ int totalWidth = 5; // Total width for each field
     }
 
     // Print bottom border
-    cout << setw(GridCellInfo::numberOfDigitsYaxis) << setfill(' ') << " ";
-    for (int i = 0; i < x_range + 2; i++) {
-        cout << setw(GridCellInfo::leftPadding + GridCellInfo::numberOfDigits) << setfill(' ') << '#' << setw(GridCellInfo::rightPadding) << setfill(' ') << "";
+    cout << setw(GridCellInfo::numberOfDigits) << setfill(' ') << " ";
+    for (int x = 0; x < x_range +2; x++) {
+        cout << setw(GridCellInfo::leftPadding + 1) << setfill(' ') << ' ' << '#' << ' ';
     }
     cout << endl;
 
     // Print x-axis labels
-    cout << setw(GridCellInfo::numberOfDigitsYaxis) << setfill(' ') << ' ' << setw(2 + GridCellInfo::leftPadding) << setfill(' ') << " "; // Row label (y-axis)
-    for (int x = 0; x < x_range; x++) {
-        cout << setw(GridCellInfo::leftPadding + GridCellInfo::numberOfDigits) << setfill(' ') << x << setw(GridCellInfo::rightPadding) << setfill(' ') << "";
-        // cout << setw(GridCellInfo::leftPadding + 1) << setfill(' ') << ' ' << x << ' ';
+    for (int i = 0; i < 4; i++) {
+        cout << setw(GridCellInfo::leftPadding + 1) << " ";
+    }
+    for (int x= 0; x < x_range; x++) {
+        cout << setw(GridCellInfo::leftPadding + 1) << setfill(' ') << ' ' << x << ' ';
     }
     cout << endl;
 }
@@ -372,7 +347,7 @@ int mainMenu() {
         cout << "5.\tDisplay Atmospheric Pressure Coverage Map (Pressure Index)" << endl;
         cout << "6.\tDisplay Atmospheric Pressure Coverage Map (LMH Symbol)" << endl;
         cout << "7.\tShow Weather Forecast Summary" << endl;
-        cout << "8.\tExit " << endl;
+        cout << "8.\tExit \n " << endl;
 
         cout << "Please enter your choice (1-8): ";
         cin >> userOption;
@@ -386,17 +361,17 @@ int mainMenu() {
 
             // Check if file cannot be opened
             if (!inFile.is_open()) {
-                cout << "Error: Unable to open file! Please try again!\n" << endl;
+                cout << "Error: Unable to open file! Please try again!\n" << fileName << endl;
                 continue;
             }
 
             string line;
-            string citylocFilePath;
-            string cloudcoverageFilePath;
-            string pressureFilePath;
+            string citylocFilePath, cloudcoverageFilePath, pressureFilePath;
+            bool citylocFound = false, cloudcoverFound = false, pressureFound = false;
 
-
+            // Read the file line by line
             while (getline(inFile, line)) {
+                // Parse grid ranges
                 size_t gridPosition = line.find("Grid");
                 if (gridPosition == 0) {
                     size_t equalPosition = line.find('=');
@@ -405,51 +380,44 @@ int mainMenu() {
                         string afterEqual = line.substr(equalPosition + 1);
 
                         size_t dashPosition = afterEqual.find('-');
-                        string beforeDash = afterEqual.substr(0, dashPosition);
-                        string afterDash = afterEqual.substr(dashPosition + 1);
+                        if (dashPosition != string::npos) {
+                            string beforeDash = afterEqual.substr(0, dashPosition);
+                            string afterDash = afterEqual.substr(dashPosition + 1);
 
-                        // Convert string to int to determine range
-                        int min = stoi(beforeDash);
-                        int max = stoi(afterDash);
+                            // Convert string to int to determine range
+                            int min = stoi(beforeDash);
+                            int max = stoi(afterDash);
 
-                        // Setting grid range for x and y
-                        if (beforeEqual == "GridX_IdxRange") {
-                            gridXmin = min;
-                            gridXmax = max;
-                        } else if (beforeEqual == "GridY_IdxRange") {
-                            gridYmin = min;
-                            gridYmax = max;
+                            // Setting grid range for x and y
+                            if (beforeEqual == "GridX_IdxRange") {
+                                gridXmin = min;
+                                gridXmax = max;
+                            } else if (beforeEqual == "GridY_IdxRange") {
+                                gridYmin = min;
+                                gridYmax = max;
+                            }
                         }
+                    }
+                }
+
+                // Check if the line contains "txt"
+                if (line.find("txt") != string::npos) {
+                    if (!citylocFound) {
+                        citylocFilePath = line;
+                        citylocFound = true;
+                    } else if (!cloudcoverFound) {
+                        cloudcoverageFilePath = line;
+                        cloudcoverFound = true;
+                    } else if (!pressureFound) {
+                        pressureFilePath = line;
+                        pressureFound = true;
                     }
                 }
             }
 
-            // Display grid ranges first
+            // Display grid ranges
             cout << "Reading in GridX_IdRange: " << gridXmin << "-" << gridXmax << " ... done!" << endl;
             cout << "Reading in GridY_IdRange: " << gridYmin << "-" << gridYmax << " ... done!" << endl;
-            cout << "\nStoring data from input file: " << endl;
-
-            // Reset file pointer to the beginning to read file paths
-            inFile.clear(); // Clear any error flags
-            inFile.seekg(0, ios::beg); // Move file pointer to the beginning
-
-            // Process file paths
-            while (getline(inFile, line)) {
-                size_t cityLocPos = line.find("citylocation.txt");
-                size_t cloudcoverPos = line.find("cloudcover.txt");
-                size_t pressurepos = line.find("pressure.txt");
-
-                if (cityLocPos != string::npos) {
-                    cout << "citylocation.txt...done" << endl;
-                    citylocFilePath = line;
-                } else if (cloudcoverPos != string::npos) {
-                    cout << "cloudcover.txt...done" << endl;
-                    cloudcoverageFilePath = line;
-                } else if (pressurepos != string::npos) {
-                    cout << "pressure.txt...done" << endl;
-                    pressureFilePath = line;
-                }
-            }
 
             // Calculate padding and other setup
             GridCellInfo::numberOfDigits = countNumberOfDigits(gridXmax); // Calculate number of digits for city ID
@@ -460,34 +428,33 @@ int mainMenu() {
             int rowSize = (gridXmax - gridXmin) + 1;
             int colSize = (gridYmax - gridYmin) + 1;
 
-
-            cout << "\nAll records successfully stored. Going back to main menu ...\n" << endl;           
-
-            // Allocate memory for cityData, cloudData, and pressureData
+            // Allocate memory for the grid
             allocateMemory(colSize, rowSize);
 
-            if (citylocFilePath.length() == 0) {
+            // Process the files
+            if (!citylocFound) {
                 cout << "City Location File Not Found" << endl;
             } else {
                 city_Location(citylocFilePath);
             }
 
-            if (cloudcoverageFilePath.length() == 0) {
+            if (!cloudcoverFound) {
                 cout << "Cloud Cover File Not Found" << endl;
             } else {
                 cloud_Coverage(cloudcoverageFilePath);
             }
 
-            if (pressureFilePath.length() == 0) {
+            if (!pressureFound) {
                 cout << "Pressure File Not Found" << endl;
             } else {
                 pressure_File(pressureFilePath);
             }
+
             inFile.close();
+            cout << "\nAll records successfully stored. Going back to main menu ...\n" << endl;
 
             // Process the average atmospheric pressure and cloud cover for each city
-            for (const auto& cityData : cityDataMap) 
-            {
+            for (const auto& cityData : cityDataMap) {
                 int cityId = cityData.first;
                 CityData data = cityData.second;
 
@@ -496,10 +463,8 @@ int mainMenu() {
                 float totalCloudCover = 0.f;
                 int totalCells = 0;
 
-                for (int x = std::max(data.lowerLeftCoord.first - 1, gridXmin) - gridXmin; x <= std::min(data.topRightCoord.first + 1, gridXmax) - gridXmin; x++) 
-                {
-                    for (int y = std::max(data.lowerLeftCoord.second - 1, gridYmin) - gridYmin; y <= std::min(data.topRightCoord.second + 1, gridYmax) - gridYmin; y++) 
-                    {
+                for (int x = std::max(data.lowerLeftCoord.first - 1, gridXmin) - gridXmin; x <= std::min(data.topRightCoord.first + 1, gridXmax) - gridXmin; x++) {
+                    for (int y = std::max(data.lowerLeftCoord.second - 1, gridYmin) - gridYmin; y <= std::min(data.topRightCoord.second + 1, gridYmax) - gridYmin; y++) {
                         totalAtmosphericPressure += grid[x][y].atmosphericPressure;
                         totalCloudCover += grid[x][y].cloudCover;
                         totalCells++;
@@ -514,10 +479,10 @@ int mainMenu() {
                 cityDataMap[cityId] = data;
             }
 
-            cout << "End of Option 1\n";
+            cout << "End of Option 1";
             fileProcessed = true; // Set the flag to true after processing the file
-        } 
-        
+        }
+            
         else if (userOption >= 2 && userOption <= 7) 
         {
             if (!fileProcessed) 
@@ -546,14 +511,14 @@ int mainMenu() {
                         cout << "Display atmospheric pressure map (Pressure Index)" << endl;
                         printMap(4);
                         promptToEnterOnly();
-                        break;
+                        break; 
                     case 6:
                         cout << "Display atmospheric pressure map (LMH symbol)" << endl;
                         printMap(5);
                         promptToEnterOnly();
                         break;
                     case 7:
-                        cout << "7" << endl;
+                        cout << "Display weather forecast summary report" << endl;
                         displaySummary();
                         promptToEnterOnly();
                         break;
@@ -657,7 +622,7 @@ void city_Location(const string& filename)
 
     if (!cityLocation.is_open()) 
     {
-        cout << "Unable to open file" << endl;
+        cout << "Unable to open city file" << endl;
         return;
     }
 
@@ -677,7 +642,7 @@ void cloud_Coverage(const string& filename)
 
     if (!cloudCoverage.is_open()) 
     {
-        cout << "Unable to open file" << endl;
+        cout << "Unable to open cloud file" << endl;
         return;
     }
 
@@ -697,14 +662,15 @@ void pressure_File(const string& filename)
 
     if (!pressureFile.is_open()) 
     {
-        cout << "Unable to open file" << endl;
+        
+        cout << "Unable to open pressure file" << endl;
         return;
     }
 
     while (getline(pressureFile, line)) 
     {
         processCityData(line, 2);
-    }
+    } 
 
     pressureFile.close();
 }
@@ -794,32 +760,20 @@ int rainchance(char acc, char ap)
 
 
 void displaySummary() {
-    for(const auto& cityData : cityDataMap) 
-    {
+    for (const auto& cityData : cityDataMap) {
         int cityID = cityData.first;
         CityData data = cityData.second;
-        string cityName;
-        switch(cityID)
-        {
-            case 1:
-                cityName = "Small_City";
-                break;
-            case 2:
-                cityName = "Mid_City";
-                break;
-            case 3:
-                cityName = "Big_City";
-                break;
-            default:
-                break;
-        }
 
         char ACC_symbol = convertToLMHSymbol(data.avgCloudCover);
         char AP_symbol = convertToLMHSymbol(data.avgAtmosphericPressure);
         int rainProbability = rainchance(ACC_symbol, AP_symbol); // Calculate rain probability
 
-        std::cout << "City Name : " << cityName << "\n";
+        cout << "\nShowing Weather Forecast Summary Report ..." << endl;
+        cout << "\nWeather Forecast Summary Report" << endl;
+        cout << "-------------------------------" << endl;
+        std::cout << "City Name : " << data.cityname << "\n"; // Use data.cityname here
         std::cout << "City ID : " << cityID << "\n";
+        cout << fixed << setprecision(2); // set precision to 2dp
         std::cout << "Average Cloud Cover (ACC) : " << data.avgCloudCover << " (" << ACC_symbol << ")\n";
         std::cout << "Average Pressure (AP) : " << data.avgAtmosphericPressure << " (" << AP_symbol << ")\n";
         std::cout << "Probability of Rain (%) : " << rainProbability << "\n";
